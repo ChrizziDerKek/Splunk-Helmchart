@@ -1,0 +1,46 @@
+{{- if eq .Values.mode "enterprise" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.enterprise.services.web.name }}
+  labels:
+    {{- include "splunk.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.enterprise.services.web.type }}
+  selector:
+    {{- include "splunk.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: web
+      port: {{ .Values.enterprise.services.web.port }}
+      targetPort: {{ .Values.enterprise.services.web.port }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.enterprise.services.hec.name }}
+  labels:
+    {{- include "splunk.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.enterprise.services.hec.type }}
+  selector:
+    {{- include "splunk.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: hec
+      port: {{ .Values.enterprise.services.hec.port }}
+      targetPort: {{ .Values.enterprise.services.hec.port }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.enterprise.services.management.name }}
+  labels:
+    {{- include "splunk.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.enterprise.services.management.type }}
+  selector:
+    {{- include "splunk.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: management
+      port: {{ .Values.enterprise.services.management.port }}
+      targetPort: {{ .Values.enterprise.services.management.port }}
+{{- end }}

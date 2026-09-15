@@ -1,0 +1,97 @@
+{{- if and (eq .Values.mode "enterprise") .Values.enterprise.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Values.enterprise.persistence.etc.pvName }}
+  labels:
+    {{- include "splunk.labels" . | nindent 4 }}
+  {{- if .Values.enterprise.persistence.keepOnUninstall }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  capacity:
+    storage: {{ .Values.enterprise.persistence.etc.capacity }}
+  volumeMode: Filesystem
+  accessModes:
+    - {{ .Values.enterprise.persistence.accessMode }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.enterprise.persistence.storageClass.name }}
+  local:
+    path: {{ .Values.enterprise.persistence.etc.hostPath | quote }}
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - {{ .Values.enterprise.persistence.nodeHostname | quote }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Values.enterprise.persistence.var.pvName }}
+  labels:
+    {{- include "splunk.labels" . | nindent 4 }}
+  {{- if .Values.enterprise.persistence.keepOnUninstall }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  capacity:
+    storage: {{ .Values.enterprise.persistence.var.capacity }}
+  volumeMode: Filesystem
+  accessModes:
+    - {{ .Values.enterprise.persistence.accessMode }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.enterprise.persistence.storageClass.name }}
+  local:
+    path: {{ .Values.enterprise.persistence.var.hostPath | quote }}
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - {{ .Values.enterprise.persistence.nodeHostname | quote }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.enterprise.persistence.etc.pvcName }}
+  labels:
+    {{- include "splunk.labels" . | nindent 4 }}
+  {{- if .Values.enterprise.persistence.keepOnUninstall }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.enterprise.persistence.accessMode }}
+  storageClassName: {{ .Values.enterprise.persistence.storageClass.name }}
+  volumeName: {{ .Values.enterprise.persistence.etc.pvName }}
+  resources:
+    requests:
+      storage: {{ .Values.enterprise.persistence.etc.requestSize }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.enterprise.persistence.var.pvcName }}
+  labels:
+    {{- include "splunk.labels" . | nindent 4 }}
+  {{- if .Values.enterprise.persistence.keepOnUninstall }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.enterprise.persistence.accessMode }}
+  storageClassName: {{ .Values.enterprise.persistence.storageClass.name }}
+  volumeName: {{ .Values.enterprise.persistence.var.pvName }}
+  resources:
+    requests:
+      storage: {{ .Values.enterprise.persistence.var.requestSize }}
+{{- end }}

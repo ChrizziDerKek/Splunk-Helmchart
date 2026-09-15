@@ -1,0 +1,16 @@
+Mode: {{ .Values.mode }}
+
+{{- if eq .Values.mode "enterprise" }}
+Splunk Enterprise:
+  https://splunk.example.site/
+
+Storage:
+  {{ .Values.enterprise.persistence.etc.pvcName }} -> {{ .Values.enterprise.persistence.etc.hostPath }}
+  {{ .Values.enterprise.persistence.var.pvcName }} -> {{ .Values.enterprise.persistence.var.hostPath }}
+
+BasicAuth middleware:
+  {{ .Values.enterprise.basicAuth.middlewareName }}
+{{- else }}
+Universal Forwarder:
+  Deployment/{{ .Release.Name }}-forwarder
+{{- end }}

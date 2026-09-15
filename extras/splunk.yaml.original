@@ -1,0 +1,128 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: splunk-web
+  namespace: data-stack
+spec:
+  selector:
+    app: splunk
+  ports:
+    - name: web
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: splunk-hec
+  namespace: data-stack
+spec:
+  type: LoadBalancer
+  selector:
+    app: splunk
+  ports:
+    - name: hec
+      port: 8088
+      targetPort: 8088
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: splunk-management
+  namespace: data-stack
+spec:
+  selector:
+    app: splunk
+  ports:
+    - name: management
+      port: 8089
+      targetPort: 8089
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: splunk
+  namespace: data-stack
+spec:
+  serviceName: splunk-web
+  replicas: 1
+  selector:
+    matchLabels:
+      app: splunk
+  template:
+    metadata:
+      labels:
+        app: splunk
+    spec:
+      enableServiceLinks: false
+      securityContext:
+        fsGroup: 41812
+      initContainers:
+        - name: fix-splunk-permissions
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              chown -R 41812:41812 /opt/splunk/etc /opt/splunk/var
+              chmod -R u+rwX /opt/splunk/etc /opt/splunk/var
+              chmod 700 /opt/splunk/etc/auth || true
+              chmod 600 /opt/splunk/etc/auth/splunk.secret || true
+              chmod 700 /opt/splunk/var/lib/splunk/kvstore/mongo || true
+              chmod 400 /opt/splunk/var/lib/splunk/kvstore/mongo/splunk.key || true
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: splunk-etc
+              mountPath: /opt/splunk/etc
+            - name: splunk-var
+              mountPath: /opt/splunk/var
+      containers:
+        - name: splunk
+          image: splunk-custom:10.0.1-java-v2
+          imagePullPolicy: Never
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              set -e
+              echo "Starting Splunk non-interactively..."
+              /opt/splunk/bin/splunk start --accept-license --answer-yes --no-prompt
+              echo "Splunk started. Monitoring splunkd..."
+              while true; do
+                if ! pgrep -f "[s]plunkd" >/dev/null; then
+                  echo "splunkd is not running anymore. Exiting container."
+                  exit 1
+                fi
+                sleep 30
+              done
+          ports:
+            - name: web
+              containerPort: 8000
+            - name: hec
+              containerPort: 8088
+            - name: management
+              containerPort: 8089
+          env:
+            - name: SPLUNK_START_ARGS
+              value: "--accept-license --answer-yes"
+            - name: SPLUNK_GENERAL_TERMS
+              value: "--accept-sgt-current-at-splunk-com"
+            - name: SPLUNK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: splunk-secret
+                  key: SPLUNK_PASSWORD
+          volumeMounts:
+            - name: splunk-etc
+              mountPath: /opt/splunk/etc
+            - name: splunk-var
+              mountPath: /opt/splunk/var
+      volumes:
+        - name: splunk-etc
+          persistentVolumeClaim:
+            claimName: splunk-etc
+        - name: splunk-var
+          persistentVolumeClaim:
+            claimName: splunk-var

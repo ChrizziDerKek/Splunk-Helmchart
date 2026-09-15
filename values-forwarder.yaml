@@ -1,0 +1,26 @@
+mode: universalForwarder
+
+auth:
+  createSecret: true
+  secretName: splunk-forwarder-secret
+  password: ""
+
+forwarder:
+  image:
+    repository: splunk/universalforwarder
+    tag: "10.0.1"
+    pullPolicy: IfNotPresent
+
+  # Replace with the reachable Splunk Enterprise hostname or URL.
+  standaloneUrl: splunk.example.internal
+
+  # Example monitor command. Adjust to the other server.
+  add: "monitor /host/var/log/*"
+
+  runAsRoot: true
+
+  extraHostPathMounts:
+    - name: host-var-log
+      hostPath: /var/log
+      mountPath: /host/var/log
+      readOnly: true

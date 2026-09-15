@@ -1,0 +1,13 @@
+{{- if and (eq .Values.mode "enterprise") .Values.enterprise.persistence.enabled .Values.enterprise.persistence.storageClass.create }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Values.enterprise.persistence.storageClass.name }}
+  labels:
+    {{- include "splunk.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+{{- end }}

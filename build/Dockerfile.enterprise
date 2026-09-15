@@ -1,0 +1,7 @@
+FROM docker.io/splunk/splunk:10.0.1
+
+USER root
+
+RUN microdnf install -y java-17-openjdk-headless || \
+    dnf install -y java-17-openjdk-headless || \
+    yum install -y java-17-openjdk-headless

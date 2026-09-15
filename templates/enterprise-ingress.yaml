@@ -1,0 +1,34 @@
+{{- if and (eq .Values.mode "enterprise") .Values.enterprise.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.enterprise.services.web.name }}
+  labels:
+    {{- include "splunk.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.enterprise.ingress.clusterIssuer | quote }}
+    {{- if .Values.enterprise.basicAuth.enabled }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s@kubernetescrd" .Release.Namespace .Values.enterprise.basicAuth.middlewareName | quote }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.enterprise.ingress.className }}
+  tls:
+    - hosts:
+        {{- range .Values.enterprise.ingress.hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .Values.enterprise.ingress.tlsSecretName }}
+  rules:
+    {{- range .Values.enterprise.ingress.hosts }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Values.enterprise.services.web.name }}
+                port:
+                  number: {{ $.Values.enterprise.services.web.port }}
+    {{- end }}
+{{- end }}

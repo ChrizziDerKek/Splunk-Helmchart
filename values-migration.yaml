@@ -1,0 +1,46 @@
+# SAFE profile for adopting the CURRENT data-stack Splunk deployment.
+mode: enterprise
+
+auth:
+  createSecret: false
+  secretName: splunk-secret
+
+enterprise:
+  image:
+    repository: splunk-custom
+    tag: "10.0.1-java-v2"
+    pullPolicy: Never
+
+  # Reproduce the current working Pod behavior exactly.
+  startupMode: legacy
+  licenseURI: ""
+
+  persistence:
+    nodeHostname: my-hostname-1337
+    storageClass:
+      name: splunk-local
+      create: false
+
+    etc:
+      pvName: splunk-etc-pv
+      pvcName: splunk-etc
+      capacity: 400Gi
+      requestSize: 400Gi
+      hostPath: /k3s/splunk/data/etc
+
+    var:
+      pvName: splunk-var-pv
+      pvcName: splunk-var
+      capacity: 400Gi
+      requestSize: 400Gi
+      hostPath: /k3s/splunk/data/var
+
+  # The old Middleware Secret is kept exactly as-is, but the Middleware is now
+  # explicitly attached to the Ingress because Splunk Free needs this layer.
+  basicAuth:
+    enabled: true
+    createSecret: false
+    secretName: splunk-basic-auth
+
+  probes:
+    enabled: false

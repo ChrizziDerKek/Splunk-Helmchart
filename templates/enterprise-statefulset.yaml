@@ -1,0 +1,119 @@
+{{- if eq .Values.mode "enterprise" }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: splunk
+  labels:
+    {{- include "splunk.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ .Values.enterprise.services.web.name }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "splunk.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "splunk.selectorLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: {{ .Values.enterprise.enableServiceLinks }}
+      securityContext:
+        fsGroup: {{ .Values.enterprise.gid }}
+      initContainers:
+        - name: fix-splunk-permissions
+          image: {{ .Values.enterprise.permissionsInit.image | quote }}
+          command:
+            - sh
+            - -c
+            - |
+              chown -R {{ .Values.enterprise.uid }}:{{ .Values.enterprise.gid }} /opt/splunk/etc /opt/splunk/var
+              chmod -R u+rwX /opt/splunk/etc /opt/splunk/var
+              chmod 700 /opt/splunk/etc/auth || true
+              chmod 600 /opt/splunk/etc/auth/splunk.secret || true
+              chmod 700 /opt/splunk/var/lib/splunk/kvstore/mongo || true
+              chmod 400 /opt/splunk/var/lib/splunk/kvstore/mongo/splunk.key || true
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: splunk-etc
+              mountPath: /opt/splunk/etc
+            - name: splunk-var
+              mountPath: /opt/splunk/var
+      containers:
+        - name: splunk
+          image: "{{ .Values.enterprise.image.repository }}:{{ .Values.enterprise.image.tag }}"
+          imagePullPolicy: {{ .Values.enterprise.image.pullPolicy }}
+          {{- if eq .Values.enterprise.startupMode "legacy" }}
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              set -e
+              echo "Starting Splunk non-interactively..."
+              /opt/splunk/bin/splunk start --accept-license --answer-yes --no-prompt
+              echo "Splunk started. Monitoring splunkd..."
+              while true; do
+                if ! pgrep -f "[s]plunkd" >/dev/null; then
+                  echo "splunkd is not running anymore. Exiting container."
+                  exit 1
+                fi
+                sleep 30
+              done
+          {{- end }}
+          ports:
+            - name: web
+              containerPort: {{ .Values.enterprise.services.web.port }}
+            - name: hec
+              containerPort: {{ .Values.enterprise.services.hec.port }}
+            - name: management
+              containerPort: {{ .Values.enterprise.services.management.port }}
+          env:
+            - name: SPLUNK_START_ARGS
+              value: {{ .Values.common.startArgs | quote }}
+            - name: SPLUNK_GENERAL_TERMS
+              value: {{ .Values.common.generalTerms | quote }}
+            - name: SPLUNK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.secretName }}
+                  key: SPLUNK_PASSWORD
+            {{- if .Values.enterprise.licenseURI }}
+            - name: SPLUNK_LICENSE_URI
+              value: {{ .Values.enterprise.licenseURI | quote }}
+            {{- end }}
+          {{- if .Values.enterprise.probes.enabled }}
+          startupProbe:
+            tcpSocket:
+              port: management
+            periodSeconds: 10
+            failureThreshold: 90
+          readinessProbe:
+            tcpSocket:
+              port: web
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            tcpSocket:
+              port: management
+            initialDelaySeconds: 180
+            periodSeconds: 30
+            failureThreshold: 6
+          {{- end }}
+          {{- with .Values.enterprise.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: splunk-etc
+              mountPath: {{ .Values.enterprise.persistence.etc.mountPath }}
+            - name: splunk-var
+              mountPath: {{ .Values.enterprise.persistence.var.mountPath }}
+      volumes:
+        - name: splunk-etc
+          persistentVolumeClaim:
+            claimName: {{ .Values.enterprise.persistence.etc.pvcName }}
+        - name: splunk-var
+          persistentVolumeClaim:
+            claimName: {{ .Values.enterprise.persistence.var.pvcName }}
+{{- end }}

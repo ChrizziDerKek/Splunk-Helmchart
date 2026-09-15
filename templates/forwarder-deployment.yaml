@@ -1,0 +1,87 @@
+{{- if eq .Values.mode "universalForwarder" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-forwarder
+  labels:
+    {{- include "splunk.labels" . | nindent 4 }}
+    app.kubernetes.io/component: universal-forwarder
+spec:
+  replicas: {{ .Values.forwarder.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: universal-forwarder
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: universal-forwarder
+    spec:
+      {{- if .Values.forwarder.runAsRoot }}
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+      {{- end }}
+      containers:
+        - name: universal-forwarder
+          image: "{{ .Values.forwarder.image.repository }}:{{ .Values.forwarder.image.tag }}"
+          imagePullPolicy: {{ .Values.forwarder.image.pullPolicy }}
+          env:
+            - name: SPLUNK_START_ARGS
+              value: {{ .Values.common.startArgs | quote }}
+            - name: SPLUNK_GENERAL_TERMS
+              value: {{ .Values.common.generalTerms | quote }}
+            - name: SPLUNK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.secretName }}
+                  key: SPLUNK_PASSWORD
+            {{- if .Values.forwarder.runAsRoot }}
+            - name: SPLUNK_USER
+              value: root
+            - name: SPLUNK_GROUP
+              value: root
+            {{- end }}
+            {{- if .Values.forwarder.standaloneUrl }}
+            - name: SPLUNK_STANDALONE_URL
+              value: {{ .Values.forwarder.standaloneUrl | quote }}
+            {{- end }}
+            {{- if .Values.forwarder.indexerUrl }}
+            - name: SPLUNK_INDEXER_URL
+              value: {{ .Values.forwarder.indexerUrl | quote }}
+            {{- end }}
+            {{- if .Values.forwarder.deploymentServer }}
+            - name: SPLUNK_DEPLOYMENT_SERVER
+              value: {{ .Values.forwarder.deploymentServer | quote }}
+            {{- end }}
+            {{- if .Values.forwarder.add }}
+            - name: SPLUNK_ADD
+              value: {{ .Values.forwarder.add | quote }}
+            {{- end }}
+            {{- if .Values.forwarder.command }}
+            - name: SPLUNK_CMD
+              value: {{ .Values.forwarder.command | quote }}
+            {{- end }}
+          {{- with .Values.forwarder.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.forwarder.extraHostPathMounts }}
+          volumeMounts:
+            {{- range .Values.forwarder.extraHostPathMounts }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath | quote }}
+              readOnly: {{ default true .readOnly }}
+            {{- end }}
+          {{- end }}
+      {{- if .Values.forwarder.extraHostPathMounts }}
+      volumes:
+        {{- range .Values.forwarder.extraHostPathMounts }}
+        - name: {{ .name }}
+          hostPath:
+            path: {{ .hostPath | quote }}
+            type: Directory
+        {{- end }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,13 @@
+{{- if and (eq .Values.mode "enterprise") .Values.enterprise.basicAuth.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Values.enterprise.basicAuth.middlewareName }}
+  labels:
+    {{- include "splunk.labels" . | nindent 4 }}
+spec:
+  basicAuth:
+    secret: {{ .Values.enterprise.basicAuth.secretName }}
+    removeHeader: {{ .Values.enterprise.basicAuth.removeHeader }}
+    realm: {{ .Values.enterprise.basicAuth.realm | quote }}
+{{- end }}

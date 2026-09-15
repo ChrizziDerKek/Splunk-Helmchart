@@ -1,0 +1,145 @@
+# enterprise | universalForwarder
+mode: enterprise
+
+common:
+  startArgs: "--accept-license --answer-yes"
+  generalTerms: "--accept-sgt-current-at-splunk-com"
+
+auth:
+  # Fresh installs are self-contained and create this Secret.
+  # Migration profile disables creation and references the existing Secret.
+  createSecret: true
+  secretName: splunk-secret
+  password: ""
+  keepOnUninstall: true
+
+enterprise:
+  image:
+    # Known-good Java-enabled image built from build/Dockerfile.enterprise.
+    repository: splunk-custom
+    tag: "10.0.1-java-v2"
+    pullPolicy: Never
+
+  # docker: use the official image entrypoint/provisioning (fresh installs).
+  # legacy: reproduce the current known-good StatefulSet command exactly.
+  startupMode: docker
+
+  # Set Free for a new Splunk Free installation. Migration profile leaves this
+  # blank so the restored/current Splunk configuration remains authoritative.
+  licenseURI: Free
+
+  uid: 41812
+  gid: 41812
+
+  enableServiceLinks: false
+
+  persistence:
+    enabled: true
+    nodeHostname: my-hostname-1337
+
+    storageClass:
+      name: splunk-local
+      create: true
+
+    keepOnUninstall: true
+    accessMode: ReadWriteOnce
+
+    etc:
+      pvName: splunk-etc-pv
+      pvcName: splunk-etc
+      capacity: 400Gi
+      requestSize: 400Gi
+      hostPath: /k3s/splunk/data/etc
+      mountPath: /opt/splunk/etc
+
+    var:
+      pvName: splunk-var-pv
+      pvcName: splunk-var
+      capacity: 400Gi
+      requestSize: 400Gi
+      hostPath: /k3s/splunk/data/var
+      mountPath: /opt/splunk/var
+
+  services:
+    web:
+      name: splunk-web
+      type: ClusterIP
+      port: 8000
+    hec:
+      name: splunk-hec
+      type: LoadBalancer
+      port: 8088
+    management:
+      name: splunk-management
+      type: ClusterIP
+      port: 8089
+
+  ingress:
+    enabled: true
+    className: traefik
+    clusterIssuer: letsencrypt-prod
+    tlsSecretName: splunk-web-tls
+    hosts:
+      - splunk.example.site
+      - www.splunk.example.site
+
+  basicAuth:
+    enabled: true
+    middlewareName: splunk-basic-auth
+
+    # Fresh installs create their own htpasswd Secret. Migration profile uses
+    # the existing secret without modifying it.
+    createSecret: true
+    secretName: splunk-basic-auth
+    username: splunk
+    password: ""
+    keepSecretOnUninstall: true
+
+    realm: Splunk
+    removeHeader: true
+
+  permissionsInit:
+    image: busybox:1.36
+
+  # Disabled in migration profile to reproduce the current workload exactly.
+  probes:
+    enabled: true
+
+  resources: {}
+
+forwarder:
+  image:
+    repository: splunk/universalforwarder
+    tag: "10.0.1"
+    pullPolicy: IfNotPresent
+
+  replicas: 1
+
+  # Universal Forwarder has no Splunk Web, so no Ingress/BasicAuth is created.
+  #
+  # Set one of these as appropriate on the other server.
+  standaloneUrl: ""
+  indexerUrl: ""
+  deploymentServer: ""
+
+  # Examples supported by docker-splunk include:
+  #   "monitor /var/log/*"
+  #   "udp 1514,monitor /var/log/*"
+  add: ""
+
+  # Optional single CLI command executed by docker-splunk.
+  command: ""
+
+  # Set true when monitored host files require root access.
+  runAsRoot: false
+
+  # Host paths to expose to the forwarder.
+  # Example:
+  # extraHostPathMounts:
+  #   - name: host-var-log
+  #     hostPath: /var/log
+  #     mountPath: /host/var/log
+  #     readOnly: true
+  extraHostPathMounts: []
+
+  resources: {}

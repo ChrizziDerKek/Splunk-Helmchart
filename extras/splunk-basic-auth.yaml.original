@@ -1,0 +1,10 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: splunk-basic-auth
+  namespace: data-stack
+spec:
+  basicAuth:
+    secret: splunk-basic-auth
+    removeHeader: true
+    realm: "Splunk"
